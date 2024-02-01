@@ -196,28 +196,9 @@ impl State {
         let mut camera_uniform = camera::CameraUniform::new();
         camera_uniform.update_view_proj(&camera);
 
-        let projector = camera::Camera {
-            eye: [-6.0, 6.0, 6.0].into(),
-            target: [0.0, 0.0, 0.0].into(),
-            up: glam::Vec3::Y,
-            aspect: config.width as f32 / config.height as f32,
-            fovy,
-            znear: 0.1,
-            zfar: 100.0,
-        };
-
-        let mut projector_uniform = camera::CameraUniform::new();
-        projector_uniform.update_view_proj(&projector);
-
         let camera_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: Some("Camera Buffer"),
             contents: bytemuck::cast_slice(&[camera_uniform]),
-            usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
-        });
-
-        let projector_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-            label: Some("Alt Camera Buffer"),
-            contents: bytemuck::cast_slice(&[projector_uniform]),
             usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
         });
 
@@ -226,16 +207,6 @@ impl State {
                 entries: &[
                     wgpu::BindGroupLayoutEntry {
                         binding: 0,
-                        visibility: wgpu::ShaderStages::VERTEX,
-                        ty: wgpu::BindingType::Buffer {
-                            ty: wgpu::BufferBindingType::Uniform,
-                            has_dynamic_offset: false,
-                            min_binding_size: None,
-                        },
-                        count: None,
-                    },
-                    wgpu::BindGroupLayoutEntry {
-                        binding: 1,
                         visibility: wgpu::ShaderStages::VERTEX,
                         ty: wgpu::BindingType::Buffer {
                             ty: wgpu::BufferBindingType::Uniform,
@@ -254,10 +225,6 @@ impl State {
                 wgpu::BindGroupEntry {
                     binding: 0,
                     resource: camera_buffer.as_entire_binding(),
-                },
-                wgpu::BindGroupEntry {
-                    binding: 1,
-                    resource: projector_buffer.as_entire_binding(),
                 },
             ],
             label: Some("camera_bind_group"),
@@ -340,7 +307,6 @@ impl State {
         );
         let cube_model = cube::Cube::new("test_cube", &device).into();
         let plane_model = cube::Plane::new("test_plane", &device).into();
-        let bb_model = cube::Billboard::new("test_bb", &device).into();
 
         Self {
             window,
@@ -357,7 +323,7 @@ impl State {
             camera_buffer,
             camera_bind_group,
             depth_texture,
-            meshes: vec![cube_model, plane_model, bb_model],
+            meshes: vec![cube_model, plane_model],
             materials: vec![material],
         }
     }
