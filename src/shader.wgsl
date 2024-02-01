@@ -7,13 +7,8 @@ struct CameraUniform {
 @group(1) @binding(0)
 var<uniform> camera: CameraUniform;
 
-@group(1) @binding(1)
-var<uniform> projector: CameraUniform;
-
 struct VertexInput {
     @location(0) position: vec3<f32>,
-    // unused
-    @location(1) tex_coords: vec2<f32>,
 };
 
 struct VertexOutput {
@@ -47,13 +42,8 @@ var s_diffuse: sampler;
 
 @fragment
 fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
-    //let texel_coords = vec2<i32>(
-    //    in.tex_coords * vec2<f32>(textureDimensions(t_diffuse))
-    //);
-    //return textureSample(t_diffuse, s_diffuse, texel_coords);
     let tex_coords = clamp(in.tex_coords, vec2<f32>(0.0), vec2<f32>(0.0));
     return textureSample(t_diffuse, s_diffuse, in.tex_coords);
-    //return vec4<f32>(1.0, 0.0, 1.0, 1.0);
 }
 
 
