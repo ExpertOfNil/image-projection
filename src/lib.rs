@@ -431,11 +431,10 @@ impl State {
 
         let mut render_pass = encoder.begin_render_pass(render_pass_desc);
         render_pass.set_pipeline(&self.pipeline);
-        //self.meshes
-        //    .iter()
-        //    .take(2)
-        //    .for_each(|m| render_pass.draw_mesh(m, &self.materials[0], &self.camera_bind_group));
-        render_pass.draw_mesh(&self.meshes[1], &self.materials[0], &self.camera_bind_group);
+        self.meshes
+            .iter()
+            .take(2)
+            .for_each(|m| render_pass.draw_mesh(m, &self.materials[0], &self.camera_bind_group));
         drop(render_pass);
 
         self.queue.submit(std::iter::once(encoder.finish()));
