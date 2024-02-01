@@ -12,7 +12,7 @@ However, the vertex to texture coordinate mapping is not known.
 Demonstrations:
 1. `master` branch: projection of a texture onto a plane where textrue
 coordinates are computed in the vertex shader.  Distortion occurs at the
-diagonal shared by the plane's two triangles.  Here is the
-[result](https://github.com/ExpertOfNil/image-projection/blob/master/res/image_projection_test_square.png).
+diagonal shared by the plane's two triangles.  Here is the result
+![result](https://github.com/ExpertOfNil/image-projection/blob/master/res/result.png).
 2. `projector` branch: same as `master` except the texture is projected from
 a static camera other than the view camera.
