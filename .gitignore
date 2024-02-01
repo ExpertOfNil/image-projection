@@ -1,0 +1,6 @@
+/target
+/dist
+/pkg
+index.html
+/res/*
+!res/image_projection_test_square.png
