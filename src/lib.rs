@@ -342,8 +342,6 @@ impl State {
         let plane_model = cube::Plane::new("test_plane", &device).into();
         let bb_model = cube::Billboard::new("test_bb", &device).into();
 
-        log::error!("View Proj: {:?}", camera_uniform.view_proj);
-
         Self {
             window,
             surface,
