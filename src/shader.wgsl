@@ -30,8 +30,11 @@ fn vs_main(
     // Calculate vertex position in clip space
     out.clip_position = camera.view_proj * vec4<f32>(model.position, 1.0);
 
+    // Transform vertex position from world space to projector space
+    let proj_space = projector.view_proj * vec4<f32>(model.position, 1.0);
+
     // Calculate vertex position in screen space
-    let ndc = out.clip_position.xyz / out.clip_position.w;
+    let ndc = proj_space.xyz / proj_space.w;
     let tex_pos = ndc * 0.5 + 0.5;
     out.tex_coords = vec2<f32>(tex_pos.x, 1.0 - tex_pos.y);
 
