@@ -25,4 +25,4 @@ a static camera other than the view camera.  This branch also includes the cube
 which should match the cube in the texture.  The texture fits the cube pretty
 well, but you'll notice that the texture seems to be pinched at the corner
 closest to the camera, on the plane. Here is the result
-![result](https://github.com/ExpertOfNil/image-projection/blob/master/res/proj_result.png)
+![result](https://github.com/ExpertOfNil/image-projection/blob/projector/res/proj_result.png)
