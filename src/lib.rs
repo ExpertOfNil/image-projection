@@ -127,7 +127,7 @@ impl State {
         let adapter = instance.request_adapter(adapter_options).await.unwrap();
 
         let descriptor = &wgpu::DeviceDescriptor {
-            features: wgpu::Features::empty(),//wgpu::Features::POLYGON_MODE_LINE,
+            features: wgpu::Features::POLYGON_MODE_LINE,
             limits: if cfg!(target_arch = "wasm32") {
                 wgpu::Limits::downlevel_webgl2_defaults()
             } else {
@@ -182,7 +182,7 @@ impl State {
         let focal_length = 50_f32;
         let fovy = 2.0 * ((sensor_size / focal_length) * 0.5).atan();
         let camera = camera::Camera {
-            eye: [-6.0, 6.0, 6.0].into(),
+            eye: [6.0, 6.0, 6.0].into(),
             target: [0.0, 0.0, 0.0].into(),
             up: glam::Vec3::Y,
             aspect: config.width as f32 / config.height as f32,
@@ -197,7 +197,7 @@ impl State {
         camera_uniform.update_view_proj(&camera);
 
         let projector = camera::Camera {
-            eye: [-6.0, 6.0, 6.0].into(),
+            eye: [6.0, 6.0, 6.0].into(),
             target: [0.0, 0.0, 0.0].into(),
             up: glam::Vec3::Y,
             aspect: config.width as f32 / config.height as f32,
