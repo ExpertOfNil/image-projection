@@ -98,18 +98,33 @@ pub struct Plane(pub model::Mesh);
 
 impl Plane {
     pub fn new(name: &str, device: &wgpu::Device) -> Self {
+        //let scale = 10.0;
+        //#[rustfmt::skip]
+        //let vertices = [
+        //    SimpleVertex { position: [-2.0 * scale, -1.0, -2.0 * scale], tex_coords: [-1.0, -1.0] },
+        //    SimpleVertex { position: [-2.0 * scale, -1.0,  2.0 * scale], tex_coords: [-1.0, -1.0] },
+        //    SimpleVertex { position: [ 2.0 * scale, -1.0,  2.0 * scale], tex_coords: [-1.0, -1.0] },
+        //    SimpleVertex { position: [ 2.0 * scale, -1.0, -2.0 * scale], tex_coords: [-1.0, -1.0] },
+        //];
+
+        //#[rustfmt::skip]
+        //let indices = [
+        //    0, 1, 2,
+        //    2, 3, 0,
+        //];
+
         #[rustfmt::skip]
         let vertices = [
-            SimpleVertex { position: [-2.0, -1.0, -2.0], tex_coords: [-1.0, -1.0] },
-            SimpleVertex { position: [-2.0, -1.0,  2.0], tex_coords: [-1.0, -1.0] },
-            SimpleVertex { position: [ 2.0, -1.0,  2.0], tex_coords: [-1.0, -1.0] },
-            SimpleVertex { position: [ 2.0, -1.0, -2.0], tex_coords: [-1.0, -1.0] },
+            ModelVertex { position: [1.0, 0.0, 0.0], tex_coords: [-1.0, -1.0], normal: [0.0, 0.0, 1.0]},
+            ModelVertex { position: [0.0, 1.0, 0.0], tex_coords: [-1.0, -1.0], normal: [0.0, 0.0, 1.0]},
+            ModelVertex { position: [0.0, 0.0, 0.0], tex_coords: [-1.0, -1.0], normal: [0.0, 0.0, 1.0]},
+            ModelVertex { position: [1.0, 1.0, 0.0], tex_coords: [-1.0, -1.0], normal: [0.0, 0.0, 1.0]},
         ];
 
         #[rustfmt::skip]
         let indices = [
             0, 1, 2,
-            2, 3, 0,
+            0, 3, 1,
         ];
 
         let vertex_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {

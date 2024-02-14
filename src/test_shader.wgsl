@@ -12,6 +12,7 @@ var<uniform> projectors: array<CameraUniform, 10>;
 
 struct VertexInput {
     @location(0) position: vec3<f32>,
+    @location(1) tex_coord: vec2<f32>,
 };
 
 struct VertexOutput {
@@ -27,7 +28,6 @@ fn vs_main(
 
     // Calculate vertex position in clip space
     out.clip_position = camera.view_proj * vec4<f32>(model.position, 1.0);
-    out.world_pos = vec4<f32>(model.position, 1.0);
     return out;
 }
 
@@ -40,13 +40,7 @@ var s_diffuse: sampler;
 
 @fragment
 fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
-    var color = vec4<f32>(0.0);
-    for (var i = 0; i < 10; i += 1) {
-        let proj_coords = projectors[i].view_proj * in.world_pos;
-        let ndc = proj_coords.xy / proj_coords.w;
-        let new_color = tex_color(ndc);
-        color = mix(new_color, color, color.a);
-    }
+    var color = vec4<f32>(1.0);
     return color;
 }
 

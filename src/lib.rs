@@ -4,6 +4,7 @@ mod model;
 mod resources;
 mod texture;
 
+use bytemuck::Pod;
 use log::{info, warn};
 use model::DrawModel;
 use model::Vertex;
@@ -20,8 +21,31 @@ use winit::{
 #[cfg(target_arch = "wasm32")]
 use wasm_bindgen::prelude::*;
 
+fn print_mat4(mat: &glam::Mat4) {
+    println!(
+        "[[{:8.4}, {:8.4}, {:8.4}, {:8.4}]",
+        mat.x_axis[0], mat.y_axis[0], mat.z_axis[0], mat.w_axis[0]
+    );
+    println!(
+        " [{:8.4}, {:8.4}, {:8.4}, {:8.4}]",
+        mat.x_axis[1], mat.y_axis[1], mat.z_axis[1], mat.w_axis[1]
+    );
+    println!(
+        " [{:8.4}, {:8.4}, {:8.4}, {:8.4}]",
+        mat.x_axis[2], mat.y_axis[2], mat.z_axis[2], mat.w_axis[2]
+    );
+    println!(
+        " [{:8.4}, {:8.4}, {:8.4}, {:8.4}]]",
+        mat.x_axis[3], mat.y_axis[3], mat.z_axis[3], mat.w_axis[3]
+    );
+    println!("x_axis: {:?}", mat.x_axis);
+    println!("y_axis: {:?}", mat.y_axis);
+    println!("z_axis: {:?}", mat.z_axis);
+    println!("w_axis: {:?}", mat.w_axis);
+}
+
 const DEFAULT_WINDOW_SIZE: PhysicalSize<u32> = PhysicalSize {
-    width: 1080,
+    width: 1920,
     height: 1080,
 };
 
@@ -99,6 +123,8 @@ struct State {
     depth_texture: texture::Texture,
     materials: Vec<model::Material>,
     meshes: Vec<model::Mesh>,
+    model_meshes: Vec<model::Mesh>,
+    projectors: Vec<camera::Projector>,
 }
 
 impl State {
@@ -127,7 +153,8 @@ impl State {
         let adapter = instance.request_adapter(adapter_options).await.unwrap();
 
         let descriptor = &wgpu::DeviceDescriptor {
-            features: wgpu::Features::POLYGON_MODE_LINE,
+            features: wgpu::Features::POLYGON_MODE_LINE
+                | wgpu::Features::ADDRESS_MODE_CLAMP_TO_BORDER,
             limits: if cfg!(target_arch = "wasm32") {
                 wgpu::Limits::downlevel_webgl2_defaults()
             } else {
@@ -182,32 +209,73 @@ impl State {
         let focal_length = 50_f32;
         let fovy = 2.0 * ((sensor_size / focal_length) * 0.5).atan();
         let camera = camera::Camera {
-            eye: [6.0, 6.0, 6.0].into(),
-            target: [0.0, 0.0, 0.0].into(),
-            up: glam::Vec3::Y,
+            eye: [0.0, -64.0, 0.0].into(),
+            target: glam::Vec3::ZERO,
+            up: glam::Vec3::Z,
             aspect: config.width as f32 / config.height as f32,
             fovy,
             znear: 0.1,
             zfar: 100.0,
         };
+        let mat = camera.build_view_projection_matrix();
 
         let camera_controller = camera::CameraController::new(0.2);
-
-        let mut camera_uniform = camera::CameraUniform::new();
-        camera_uniform.update_view_proj(&camera);
-
-        let projector = camera::Camera {
-            eye: [6.0, 6.0, 6.0].into(),
-            target: [0.0, 0.0, 0.0].into(),
-            up: glam::Vec3::Y,
-            aspect: config.width as f32 / config.height as f32,
-            fovy,
-            znear: 0.1,
-            zfar: 100.0,
+        let camera_uniform = camera::CameraUniform {
+            view_proj: [
+                mat.x_axis.into(),
+                mat.y_axis.into(),
+                mat.z_axis.into(),
+                mat.w_axis.into(),
+            ],
         };
 
-        let mut projector_uniform = camera::CameraUniform::new();
-        projector_uniform.update_view_proj(&projector);
+        //let mut camera_uniform = camera::CameraUniform::new();
+        //camera_uniform.update_view_proj(&camera);
+
+        let img1 = resources::load_texture("0001.png", &device, &queue)
+            .await
+            .unwrap();
+        let mat1 = model::Material::new("0001", img1, &device, &texture_bind_group_layout);
+        let img2 = resources::load_texture("0002.png", &device, &queue)
+            .await
+            .unwrap();
+        let mat2 = model::Material::new("0002", img2, &device, &texture_bind_group_layout);
+        let img3 = resources::load_texture("0003.png", &device, &queue)
+            .await
+            .unwrap();
+        let mat3 = model::Material::new("0003", img3, &device, &texture_bind_group_layout);
+        let projectors = vec![
+            camera::Projector {
+                pos: [7.0, -40.0, 5.0].into(),
+                rot: camera::EulerDegreesXYZ([84.0, 2.0, 2.0]).into(),
+                aspect: config.width as f32 / config.height as f32,
+                fovy,
+                znear: 0.1,
+                zfar: 100.0,
+                material: mat1,
+            },
+            camera::Projector {
+                pos: [0.0, -31.0, 3.0].into(),
+                rot: camera::EulerDegreesXYZ([78.0, 2.0, -4.0]).into(),
+                aspect: config.width as f32 / config.height as f32,
+                fovy,
+                znear: 0.1,
+                zfar: 100.0,
+                material: mat2,
+            },
+            camera::Projector {
+                pos: [-8.0, -33.0, 12.0].into(),
+                rot: camera::EulerDegreesXYZ([69.0, 4.0, 5.0]).into(),
+                aspect: config.width as f32 / config.height as f32,
+                fovy,
+                znear: 0.1,
+                zfar: 100.0,
+                material: mat3,
+            },
+        ];
+
+        let projector_uniforms: Vec<camera::CameraUniform> =
+            projectors.iter().map(camera::CameraUniform::from).collect();
 
         let camera_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: Some("Camera Buffer"),
@@ -216,8 +284,8 @@ impl State {
         });
 
         let projector_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-            label: Some("Alt Camera Buffer"),
-            contents: bytemuck::cast_slice(&[projector_uniform]),
+            label: Some("Projector Buffer"),
+            contents: bytemuck::cast_slice(projector_uniforms.as_slice()),
             usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
         });
 
@@ -236,7 +304,7 @@ impl State {
                     },
                     wgpu::BindGroupLayoutEntry {
                         binding: 1,
-                        visibility: wgpu::ShaderStages::VERTEX,
+                        visibility: wgpu::ShaderStages::FRAGMENT,
                         ty: wgpu::BindingType::Buffer {
                             ty: wgpu::BufferBindingType::Uniform,
                             has_dynamic_offset: false,
@@ -291,7 +359,7 @@ impl State {
             vertex: wgpu::VertexState {
                 module: &shader,
                 entry_point: "vs_main",
-                buffers: &[cube::SimpleVertex::desc()],
+                buffers: &[model::ModelVertex::desc()],
             },
             fragment: Some(wgpu::FragmentState {
                 module: &shader,
@@ -341,6 +409,9 @@ impl State {
         let cube_model = cube::Cube::new("test_cube", &device).into();
         let plane_model = cube::Plane::new("test_plane", &device).into();
         let bb_model = cube::Billboard::new("test_bb", &device).into();
+        let model_meshes = resources::load_meshes("projection_objects_zup.obj", &device)
+            .await
+            .expect("Failed to load meshes");
 
         Self {
             window,
@@ -359,6 +430,8 @@ impl State {
             depth_texture,
             meshes: vec![cube_model, plane_model, bb_model],
             materials: vec![material],
+            model_meshes,
+            projectors,
         }
     }
 
@@ -431,10 +504,18 @@ impl State {
 
         let mut render_pass = encoder.begin_render_pass(render_pass_desc);
         render_pass.set_pipeline(&self.pipeline);
-        self.meshes
-            .iter()
-            .take(2)
-            .for_each(|m| render_pass.draw_mesh(m, &self.materials[0], &self.camera_bind_group));
+        //self.meshes
+        //    .iter()
+        //    .take(2)
+        //    .for_each(|m| render_pass.draw_mesh(m, &self.materials[0], &self.camera_bind_group));
+        //render_pass.draw_mesh(&self.meshes[1], &self.materials[1], &self.camera_bind_group);
+        self.projectors.iter()
+            .for_each(|proj| self.model_meshes.iter().for_each(|m| {
+                render_pass.draw_mesh(m, &proj.material, &self.camera_bind_group)
+            }));
+        //self.model_meshes
+        //    .iter()
+        //    .for_each(|m| render_pass.draw_mesh(m, &self.materials[0], &self.camera_bind_group));
         drop(render_pass);
 
         self.queue.submit(std::iter::once(encoder.finish()));

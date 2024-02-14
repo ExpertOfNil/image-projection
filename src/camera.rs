@@ -1,4 +1,5 @@
-use crate::{PhysicalKey, WindowEvent, KeyCode};
+use crate::model;
+use crate::{KeyCode, PhysicalKey, WindowEvent};
 
 pub enum Movement {
     Forward,
@@ -11,6 +12,7 @@ pub struct Camera {
     pub eye: glam::Vec3,
     pub target: glam::Vec3,
     pub up: glam::Vec3,
+    //pub view: glam::Mat4,
     pub aspect: f32,
     pub fovy: f32,
     pub znear: f32,
@@ -19,45 +21,15 @@ pub struct Camera {
 
 impl Camera {
     const SPEED: f32 = 0.2;
+    pub fn view_matrix(&self) -> glam::Mat4 {
+        glam::Mat4::look_at_rh(self.eye, self.target, self.up)
+        //self.view
+    }
     pub fn build_view_projection_matrix(&self) -> glam::Mat4 {
         let view = glam::Mat4::look_at_rh(self.eye, self.target, self.up);
-        let proj = glam::Mat4::perspective_rh(
-            self.fovy,
-            self.aspect,
-            self.znear,
-            self.zfar,
-        );
+        let proj = glam::Mat4::perspective_rh(self.fovy, self.aspect, self.znear, self.zfar);
         proj * view
-    }
-
-    pub fn update(&mut self, direction: Movement) {
-        let fwd = self.target - self.eye;
-        let fwd_norm = fwd.normalize();
-        let fwd_mag = fwd.length();
-
-        match direction {
-            Movement::Forward => {
-                //if fwd_mag > Self::SPEED {
-                //    //self.eye += fwd_norm * Self::SPEED;
-                //    self.eye = self.target - (fwd + self.up * Self::SPEED).normalize() * fwd_mag;
-                //}
-                self.eye = self.target - (fwd + self.up * Self::SPEED).normalize() * fwd_mag;
-            }
-            Movement::Backward => {
-                //if fwd_mag > Self::SPEED {
-                //    self.eye -= fwd_norm * Self::SPEED;
-                //}
-                self.eye = self.target - (fwd - self.up * Self::SPEED).normalize() * fwd_mag;
-            }
-            Movement::Right => {
-                let right = fwd_norm.cross(self.up);
-                self.eye = self.target - (fwd + right * Self::SPEED).normalize() * fwd_mag;
-            }
-            Movement::Left => {
-                let right = fwd_norm.cross(self.up);
-                self.eye = self.target - (fwd - right * Self::SPEED).normalize() * fwd_mag;
-            }
-        }
+        //proj * self.view
     }
 }
 
@@ -152,9 +124,7 @@ impl CameraUniform {
             ident.w_axis.into(),
         ];
 
-        Self {
-            view_proj,
-        }
+        Self { view_proj }
     }
 
     pub fn update_view_proj(&mut self, camera: &Camera) {
@@ -165,5 +135,56 @@ impl CameraUniform {
             matrix.z_axis.into(),
             matrix.w_axis.into(),
         ];
+    }
+}
+
+pub struct Projector {
+    pub pos: glam::Vec3,
+    pub rot: glam::Quat,
+    pub aspect: f32,
+    pub fovy: f32,
+    pub znear: f32,
+    pub zfar: f32,
+    pub material: model::Material,
+}
+
+impl Projector {
+    pub fn build_view_projection_matrix(&self) -> glam::Mat4 {
+        let view = glam::Mat4::from_rotation_translation(self.rot, self.pos);
+        let fwd = (view * glam::Vec4::new(0.0, 0.0, -1.0, 1.0)).normalize();
+        let fwd = glam::vec3(fwd.x, fwd.y, fwd.z);
+        let eye = view * glam::Vec4::new(0.0, 0.0, 0.0, 1.0);
+        let eye = glam::vec3(eye.x, eye.y, eye.z);
+        let view = glam::Mat4::look_to_rh(eye, fwd, glam::Vec3::Z);
+        let proj = glam::Mat4::perspective_rh(self.fovy, self.aspect, self.znear, self.zfar);
+        proj * view
+    }
+}
+
+pub struct EulerDegreesXYZ(pub [f32; 3]);
+
+impl From<EulerDegreesXYZ> for glam::Quat {
+    fn from(value: EulerDegreesXYZ) -> glam::Quat {
+        let [x, y, z] = value.0;
+        glam::Quat::from_euler(
+            glam::EulerRot::XYZ,
+            x.to_radians(),
+            y.to_radians(),
+            z.to_radians(),
+        )
+    }
+}
+
+impl From<&Projector> for CameraUniform {
+    fn from(value: &Projector) -> CameraUniform {
+        let matrix = value.build_view_projection_matrix();
+        CameraUniform {
+            view_proj: [
+                matrix.x_axis.into(),
+                matrix.y_axis.into(),
+                matrix.z_axis.into(),
+                matrix.w_axis.into(),
+            ],
+        }
     }
 }
