@@ -56,7 +56,7 @@ fn tex_color(ndc: vec2<f32>) -> vec4<f32> {
     if tex_pos.x >= 0.0 && tex_pos.x <= 1.0
         && tex_pos.y >= 0.0 && tex_pos.y <= 1.0
     {
-        let tex_coords = vec2<f32>(tex_pos.x, 1.0 - tex_pos.y);
+        let tex_coords = vec2<f32>(tex_pos.x, tex_pos.y);
         return textureSample(t_diffuse, s_diffuse, tex_coords);
     }
     return vec4<f32>(0.0);

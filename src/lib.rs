@@ -125,6 +125,12 @@ struct State {
     meshes: Vec<model::Mesh>,
     model_meshes: Vec<model::Mesh>,
     projectors: Vec<camera::Projector>,
+
+    axis_pipeline: wgpu::RenderPipeline,
+    axis_bind_group: wgpu::BindGroup,
+    axis_meshes: Vec<model::Mesh>,
+    axis_instances: Vec<Instance>,
+    axis_instance_buffer: wgpu::Buffer,
 }
 
 impl State {
@@ -232,6 +238,12 @@ impl State {
         //let mut camera_uniform = camera::CameraUniform::new();
         //camera_uniform.update_view_proj(&camera);
 
+        let test_texture =
+            resources::load_texture("image_projection_test_square.png", &device, &queue)
+                .await
+                .unwrap();
+        let test_mat =
+            model::Material::new("test", test_texture, &device, &texture_bind_group_layout);
         let img1 = resources::load_texture("0001.png", &device, &queue)
             .await
             .unwrap();
@@ -331,6 +343,44 @@ impl State {
             label: Some("camera_bind_group"),
         });
 
+        let axis_instances: Vec<Instance> = projectors
+            .iter()
+            .map(|proj| Instance {
+                position: proj.pos,
+                rotation: proj.rot,
+            })
+            .collect();
+        let axis_instance_data: Vec<InstanceRaw> =
+            axis_instances.iter().map(Instance::to_raw).collect();
+        let axis_instance_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+            label: Some("Axis Instance Buffer"),
+            contents: bytemuck::cast_slice(&axis_instance_data),
+            usage: wgpu::BufferUsages::VERTEX,
+        });
+        let axis_bind_group_layout =
+            device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+                entries: &[wgpu::BindGroupLayoutEntry {
+                    binding: 0,
+                    visibility: wgpu::ShaderStages::VERTEX,
+                    ty: wgpu::BindingType::Buffer {
+                        ty: wgpu::BufferBindingType::Uniform,
+                        has_dynamic_offset: false,
+                        min_binding_size: None,
+                    },
+                    count: None,
+                }],
+                label: Some("axis_bind_group_layout"),
+            });
+
+        let axis_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
+            layout: &axis_bind_group_layout,
+            entries: &[wgpu::BindGroupEntry {
+                binding: 0,
+                resource: camera_buffer.as_entire_binding(),
+            }],
+            label: Some("axis_bind_group"),
+        });
+
         let clear_color = wgpu::Color {
             r: 0.1,
             g: 0.2,
@@ -345,6 +395,62 @@ impl State {
 
         let depth_texture =
             texture::Texture::create_depth_texture(&device, &config, "depth_texture");
+
+        let axis_shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
+            label: Some("Axis Shader"),
+            source: wgpu::ShaderSource::Wgsl(include_str!("axis_shader.wgsl").into()),
+        });
+
+        let axis_pipeline_layout_desc = &wgpu::PipelineLayoutDescriptor {
+            label: Some("Render Pipeline Layout"),
+            bind_group_layouts: &[&axis_bind_group_layout],
+            push_constant_ranges: &[],
+        };
+        let axis_pipeline_layout = device.create_pipeline_layout(axis_pipeline_layout_desc);
+
+        let axis_pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+            label: Some("Render Pipeline"),
+            layout: Some(&axis_pipeline_layout),
+            vertex: wgpu::VertexState {
+                module: &axis_shader,
+                entry_point: "vs_main",
+                buffers: &[model::ModelVertex::desc(), InstanceRaw::desc()],
+            },
+            fragment: Some(wgpu::FragmentState {
+                module: &axis_shader,
+                entry_point: "fs_main",
+                targets: &[Some(wgpu::ColorTargetState {
+                    format: config.format,
+                    blend: Some(wgpu::BlendState {
+                        color: wgpu::BlendComponent::REPLACE,
+                        alpha: wgpu::BlendComponent::REPLACE,
+                    }),
+                    write_mask: wgpu::ColorWrites::ALL,
+                })],
+            }),
+            primitive: wgpu::PrimitiveState {
+                topology: wgpu::PrimitiveTopology::TriangleList,
+                strip_index_format: None,
+                front_face: wgpu::FrontFace::Ccw,
+                cull_mode: Some(wgpu::Face::Back),
+                polygon_mode: wgpu::PolygonMode::Fill,
+                unclipped_depth: false,
+                conservative: false,
+            },
+            depth_stencil: Some(wgpu::DepthStencilState {
+                format: texture::Texture::DEPTH_FORMAT,
+                depth_write_enabled: true,
+                depth_compare: wgpu::CompareFunction::Less,
+                stencil: wgpu::StencilState::default(),
+                bias: wgpu::DepthBiasState::default(),
+            }),
+            multisample: wgpu::MultisampleState {
+                count: 1,
+                mask: !0,
+                alpha_to_coverage_enabled: false,
+            },
+            multiview: None,
+        });
 
         let pipeline_layout_desc = &wgpu::PipelineLayoutDescriptor {
             label: Some("Render Pipeline Layout"),
@@ -412,6 +518,9 @@ impl State {
         let model_meshes = resources::load_meshes("projection_objects_zup.obj", &device)
             .await
             .expect("Failed to load meshes");
+        let axis_meshes = resources::load_meshes("axis_system.obj", &device)
+            .await
+            .expect("Failed to load axis model");
 
         Self {
             window,
@@ -432,6 +541,12 @@ impl State {
             materials: vec![material],
             model_meshes,
             projectors,
+
+            axis_meshes,
+            axis_bind_group,
+            axis_pipeline,
+            axis_instances,
+            axis_instance_buffer,
         }
     }
 
@@ -509,13 +624,20 @@ impl State {
         //    .take(2)
         //    .for_each(|m| render_pass.draw_mesh(m, &self.materials[0], &self.camera_bind_group));
         //render_pass.draw_mesh(&self.meshes[1], &self.materials[1], &self.camera_bind_group);
-        self.projectors.iter()
-            .for_each(|proj| self.model_meshes.iter().for_each(|m| {
-                render_pass.draw_mesh(m, &proj.material, &self.camera_bind_group)
-            }));
-        //self.model_meshes
-        //    .iter()
-        //    .for_each(|m| render_pass.draw_mesh(m, &self.materials[0], &self.camera_bind_group));
+        self.projectors.iter().for_each(|proj| {
+            self.model_meshes
+                .iter()
+                .for_each(|m| render_pass.draw_mesh(m, &proj.material, &self.camera_bind_group))
+        });
+        render_pass.set_vertex_buffer(1, self.axis_instance_buffer.slice(..));
+        render_pass.set_pipeline(&self.axis_pipeline);
+        self.axis_meshes.iter().for_each(|m| {
+            render_pass.draw_raw_mesh_instanced(
+                m,
+                0..self.axis_instances.len() as _,
+                &self.axis_bind_group,
+            )
+        });
         drop(render_pass);
 
         self.queue.submit(std::iter::once(encoder.finish()));

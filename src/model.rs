@@ -110,12 +110,42 @@ pub trait DrawModel<'a> {
         instances: std::ops::Range<u32>,
         camera_bind_group: &'a wgpu::BindGroup,
     );
+    fn draw_raw_mesh(
+        &mut self,
+        mesh: &'a Mesh,
+        bind_group: &'a wgpu::BindGroup,
+    );
+    fn draw_raw_mesh_instanced(
+        &mut self,
+        mesh: &'a Mesh,
+        instances: std::ops::Range<u32>,
+        bind_group: &'a wgpu::BindGroup,
+    );
 }
 
 impl<'a, 'b> DrawModel<'b> for wgpu::RenderPass<'a>
 where
     'b: 'a,
 {
+    fn draw_raw_mesh_instanced (
+        &mut self,
+        mesh: &'a Mesh,
+        instances: std::ops::Range<u32>,
+        bind_group: &'a wgpu::BindGroup,
+    ) {
+        self.set_vertex_buffer(0, mesh.vertex_buffer.slice(..));
+        self.set_index_buffer(mesh.index_buffer.slice(..), wgpu::IndexFormat::Uint32);
+        self.set_bind_group(0, bind_group, &[]);
+        self.draw_indexed(0..mesh.num_elements, 0, instances);
+    }
+    fn draw_raw_mesh(
+        &mut self,
+        mesh: &'a Mesh,
+        bind_group: &'a wgpu::BindGroup,
+    ) {
+        self.draw_raw_mesh_instanced(mesh, 0..1, bind_group);
+    }
+
     fn draw_mesh(
         &mut self,
         mesh: &'a Mesh,
