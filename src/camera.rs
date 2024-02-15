@@ -139,8 +139,7 @@ impl CameraUniform {
 }
 
 pub struct Projector {
-    pub pos: glam::Vec3,
-    pub rot: glam::Quat,
+    pub view: glam::Mat4,
     pub aspect: f32,
     pub fovy: f32,
     pub znear: f32,
@@ -149,15 +148,64 @@ pub struct Projector {
 }
 
 impl Projector {
-    pub fn build_view_projection_matrix(&self) -> glam::Mat4 {
-        let view = glam::Mat4::from_rotation_translation(self.rot, self.pos);
+    pub fn new(material: model::Material) -> Self {
+        let sensor_size = 24_f32;
+        let focal_length = 50_f32;
+        let fovy = 2.0 * ((sensor_size / focal_length) * 0.5).atan();
+        Self {
+            view: glam::Mat4::default(),
+            aspect: 16.0/9.0,
+            fovy,
+            znear: 0.1,
+            zfar: 100.0,
+            material,
+        }
+    }
+
+    pub fn with_fovy(self, fovy: f32) -> Self {
+        let mut this = self;
+        this.fovy = fovy;
+        this
+    }
+
+    pub fn with_eye_target_up(self, eye: glam::Vec3, target: glam::Vec3, up: glam::Vec3) -> Self {
+        let mut this = self;
+        this.view = glam::Mat4::look_to_rh(eye, target, up);
+        this
+    }
+
+    pub fn with_rotation_translation(self, rot: glam::Quat, pos: glam::Vec3) -> Self {
+        let view = glam::Mat4::from_rotation_translation(rot, pos);
         let fwd = (view * glam::Vec4::new(0.0, 0.0, -1.0, 1.0)).normalize();
         let fwd = glam::vec3(fwd.x, fwd.y, fwd.z);
         let eye = view * glam::Vec4::new(0.0, 0.0, 0.0, 1.0);
         let eye = glam::vec3(eye.x, eye.y, eye.z);
-        let view = glam::Mat4::look_to_rh(eye, fwd, glam::Vec3::Z);
+        let mut this = self;
+        this.view = glam::Mat4::look_to_rh(eye, fwd, glam::Vec3::Z);
+        this
+    }
+
+    pub fn with_view(self, view: glam::Mat4) -> Self {
+        let mut this = self;
+        this.view = view;
+        this
+    }
+
+    pub fn rotation(&self) -> glam::Quat {
+        glam::Quat::from_mat4(&self.view)
+    }
+
+    pub fn position(&self) -> glam::Vec3 {
+        glam::Vec3 {
+            x: self.view.w_axis.x,
+            y: self.view.w_axis.y,
+            z: self.view.w_axis.z,
+        }
+    }
+
+    pub fn build_view_projection_matrix(&self) -> glam::Mat4 {
         let proj = glam::Mat4::perspective_rh(self.fovy, self.aspect, self.znear, self.zfar);
-        proj * view
+        proj * self.view
     }
 }
 

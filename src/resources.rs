@@ -29,6 +29,7 @@ pub async fn load_string(file_name: &str) -> anyhow::Result<String> {
             let path = std::path::Path::new(std::env!("OUT_DIR"))
                 .join("res")
                 .join(file_name);
+            println!("Loading {:?}...", path);
             let txt = std::fs::read_to_string(path)?;
         }
     }
@@ -61,6 +62,7 @@ pub async fn load_texture(
     device: &wgpu::Device,
     queue: &wgpu::Queue,
 ) -> anyhow::Result<texture::Texture> {
+    println!("Loading {:?}...", file_name);
     let data = load_binary(file_name).await?;
     texture::Texture::from_bytes(device, queue, &data, file_name)
 }
@@ -164,7 +166,10 @@ pub async fn load_meshes(
     file_name: &str,
     device: &wgpu::Device,
 ) -> anyhow::Result<Vec<model::Mesh>> {
-    let obj_text = load_string(file_name).await?;
+    let file_path = std::path::Path::new(file_name);
+    let folder = file_path.parent();
+    println!("Loading {:?}...", file_path);
+    let obj_text = load_string(file_path.to_str().unwrap()).await?;
     let obj_cursor = Cursor::new(obj_text);
     let mut obj_reader = BufReader::new(obj_cursor);
 
@@ -176,7 +181,12 @@ pub async fn load_meshes(
             ..Default::default()
         },
         |p| async move {
-            let mat_text = load_string(&p).await.unwrap();
+            let matl_path = match folder {
+                Some(parent) => parent.join(p).to_str().unwrap_or_default().to_string(),
+                None => p,
+            };
+            println!("Loading {:?}...", matl_path);
+            let mat_text = load_string(&matl_path).await.unwrap();
             tobj::load_mtl_buf(&mut BufReader::new(Cursor::new(mat_text)))
         },
     )

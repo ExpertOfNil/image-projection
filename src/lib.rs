@@ -21,6 +21,37 @@ use winit::{
 #[cfg(target_arch = "wasm32")]
 use wasm_bindgen::prelude::*;
 
+pub fn target_from_pos_rot(pos: glam::Vec3, rot: glam::Quat) -> (glam::Vec3, glam::Vec3) {
+    let view = glam::Mat4::from_cols(
+        glam::Vec4::new(
+            0.9969562292098999,
+            -0.06971397995948792,
+            -0.034899502992630005,
+            0.0,
+        ),
+        glam::Vec4::new(
+            0.048556890338659286,
+            0.20502381026744843,
+            0.9775517582893372,
+            0.0,
+        ),
+        glam::Vec4::new(
+            -0.060993801802396774,
+            -0.9762710928916931,
+            0.20778487622737885,
+            0.0,
+        ),
+        glam::Vec4::new(0.0, -31.0, 3.0, 1.0),
+    );
+
+    //let view = glam::Mat4::from_rotation_translation(rot, pos);
+    let fwd = (view * glam::Vec4::new(0.0, 0.0, -1.0, 1.0)).normalize();
+    let fwd = glam::vec3(fwd.x, fwd.y, fwd.z);
+    let eye = view * glam::Vec4::new(0.0, 0.0, 0.0, 1.0);
+    let eye = glam::vec3(eye.x, eye.y, eye.z);
+    (eye, fwd)
+}
+
 fn print_mat4(mat: &glam::Mat4) {
     println!(
         "[[{:8.4}, {:8.4}, {:8.4}, {:8.4}]",
@@ -214,10 +245,14 @@ impl State {
         let sensor_size = 24_f32;
         let focal_length = 50_f32;
         let fovy = 2.0 * ((sensor_size / focal_length) * 0.5).atan();
+        //let pos: glam::Vec3 = [0.0, -31.0, 3.0].into();
+        //let rot: glam::Quat = camera::EulerDegreesXYZ([78.0, 2.0, -4.0]).into();
+        //let (eye, target) = target_from_pos_rot(pos, rot);
         let camera = camera::Camera {
-            eye: [0.0, -64.0, 0.0].into(),
+            //eye: [0.0, -72.0, 6.0].into(),
+            eye: [0.0, 0.0, 5.0].into(),
             target: glam::Vec3::ZERO,
-            up: glam::Vec3::Z,
+            up: glam::Vec3::Y,
             aspect: config.width as f32 / config.height as f32,
             fovy,
             znear: 0.1,
@@ -238,52 +273,91 @@ impl State {
         //let mut camera_uniform = camera::CameraUniform::new();
         //camera_uniform.update_view_proj(&camera);
 
-        let test_texture =
-            resources::load_texture("image_projection_test_square.png", &device, &queue)
-                .await
-                .unwrap();
-        let test_mat =
-            model::Material::new("test", test_texture, &device, &texture_bind_group_layout);
-        let img1 = resources::load_texture("0001.png", &device, &queue)
+        //let test_texture =
+        //    resources::load_texture("image_projection_test_square.png", &device, &queue)
+        //        .await
+        //        .unwrap();
+        //let test_mat =
+        //    model::Material::new("test", test_texture, &device, &texture_bind_group_layout);
+        let img1 = resources::load_texture("calibration/0001.png", &device, &queue)
             .await
             .unwrap();
         let mat1 = model::Material::new("0001", img1, &device, &texture_bind_group_layout);
-        let img2 = resources::load_texture("0002.png", &device, &queue)
-            .await
-            .unwrap();
-        let mat2 = model::Material::new("0002", img2, &device, &texture_bind_group_layout);
-        let img3 = resources::load_texture("0003.png", &device, &queue)
-            .await
-            .unwrap();
-        let mat3 = model::Material::new("0003", img3, &device, &texture_bind_group_layout);
+        //let img2 = resources::load_texture("calibration/0002.png", &device, &queue)
+        //    .await
+        //    .unwrap();
+        //let mat2 = model::Material::new("0002", img2, &device, &texture_bind_group_layout);
+        //let img3 = resources::load_texture("calibration/0003.png", &device, &queue)
+        //    .await
+        //    .unwrap();
+        //let mat3 = model::Material::new("0003", img3, &device, &texture_bind_group_layout);
         let projectors = vec![
-            camera::Projector {
-                pos: [7.0, -40.0, 5.0].into(),
-                rot: camera::EulerDegreesXYZ([84.0, 2.0, 2.0]).into(),
-                aspect: config.width as f32 / config.height as f32,
-                fovy,
-                znear: 0.1,
-                zfar: 100.0,
-                material: mat1,
-            },
-            camera::Projector {
-                pos: [0.0, -31.0, 3.0].into(),
-                rot: camera::EulerDegreesXYZ([78.0, 2.0, -4.0]).into(),
-                aspect: config.width as f32 / config.height as f32,
-                fovy,
-                znear: 0.1,
-                zfar: 100.0,
-                material: mat2,
-            },
-            camera::Projector {
-                pos: [-8.0, -33.0, 12.0].into(),
-                rot: camera::EulerDegreesXYZ([69.0, 4.0, 5.0]).into(),
-                aspect: config.width as f32 / config.height as f32,
-                fovy,
-                znear: 0.1,
-                zfar: 100.0,
-                material: mat3,
-            },
+            //camera::Projector {
+            //    pos: [7.0, -40.0, 5.0].into(),
+            //    rot: camera::EulerDegreesXYZ([84.0, 2.0, 2.0]).into(),
+            //    aspect: config.width as f32 / config.height as f32,
+            //    fovy,
+            //    znear: 0.1,
+            //    zfar: 100.0,
+            //    material: mat1,
+            //},
+            //camera::Projector {
+            //    pos: [0.0, -31.0, 3.0].into(),
+            //    rot: camera::EulerDegreesXYZ([78.0, 2.0, -4.0]).into(),
+            //    aspect: config.width as f32 / config.height as f32,
+            //    fovy,
+            //    znear: 0.1,
+            //    zfar: 100.0,
+            //    material: mat2,
+            //},
+            //camera::Projector {
+            //    pos: [-8.0, -33.0, 12.0].into(),
+            //    rot: camera::EulerDegreesXYZ([69.0, 4.0, 5.0]).into(),
+            //    aspect: config.width as f32 / config.height as f32,
+            //    fovy,
+            //    znear: 0.1,
+            //    zfar: 100.0,
+            //    material: mat3,
+            //},
+            camera::Projector::new(mat1)
+                .with_fovy(fovy)
+                .with_view(glam::Mat4::from_cols(
+                    glam::Vec4::new(1.0, 0.0, 0.0, 0.0),
+                    glam::Vec4::new(0.0, 1.0, 0.0, 0.0),
+                    glam::Vec4::new(0.0, 0.0, 1.0, 0.0),
+                    glam::Vec4::new(0.0, 0.0, 5.0, 1.0),
+                )),
+            //camera::Projector::new(mat2)
+            //    .with_fovy(fovy)
+            //    .with_view(glam::Mat4::from_cols(
+            //        glam::Vec4::new(0.0, -1.0, 0.0, 0.0),
+            //        glam::Vec4::new(0.7071067690849304, 0.0, 0.7071067690849304, 0.0),
+            //        glam::Vec4::new(-0.7071068286895752, 0.0, 0.7071068286895752, 0.0),
+            //        glam::Vec4::new(-5.0, 0.0, 5.0, 1.0),
+            //    )),
+            //camera::Projector::new(mat3)
+            //    .with_fovy(fovy)
+            //    .with_view(glam::Mat4::from_cols(
+            //        glam::Vec4::new(
+            //            -0.5547001957893372,
+            //            0.8320503830909729,
+            //            -1.4901162970204496e-08,
+            //            0.0,
+            //        ),
+            //        glam::Vec4::new(
+            //            -0.6748818755149841,
+            //            -0.44992122054100037,
+            //            0.5848976373672485,
+            //            0.0,
+            //        ),
+            //        glam::Vec4::new(
+            //            0.4866642355918884,
+            //            0.3244428336620331,
+            //            0.8111070990562439,
+            //            0.0,
+            //        ),
+            //        glam::Vec4::new(3.0, 2.0, 5.0, 1.0),
+            //    )),
         ];
 
         let projector_uniforms: Vec<camera::CameraUniform> =
@@ -346,8 +420,8 @@ impl State {
         let axis_instances: Vec<Instance> = projectors
             .iter()
             .map(|proj| Instance {
-                position: proj.pos,
-                rotation: proj.rot,
+                position: proj.position(),
+                rotation: proj.rotation(),
             })
             .collect();
         let axis_instance_data: Vec<InstanceRaw> =
@@ -515,7 +589,7 @@ impl State {
         let cube_model = cube::Cube::new("test_cube", &device).into();
         let plane_model = cube::Plane::new("test_plane", &device).into();
         let bb_model = cube::Billboard::new("test_bb", &device).into();
-        let model_meshes = resources::load_meshes("projection_objects_zup.obj", &device)
+        let model_meshes = resources::load_meshes("calibration/calibration.obj", &device)
             .await
             .expect("Failed to load meshes");
         let axis_meshes = resources::load_meshes("axis_system.obj", &device)
