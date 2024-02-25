@@ -144,11 +144,25 @@ pub struct Projector {
     pub fovy: f32,
     pub znear: f32,
     pub zfar: f32,
-    pub material: model::Material,
+    //pub material: model::Material,
 }
 
 impl Projector {
-    pub fn new(material: model::Material) -> Self {
+    //pub fn new(material: model::Material) -> Self {
+    //    let sensor_size = 24_f32;
+    //    let focal_length = 50_f32;
+    //    let fovy = 2.0 * ((sensor_size / focal_length) * 0.5).atan();
+    //    Self {
+    //        view: glam::Mat4::default(),
+    //        aspect: 16.0/9.0,
+    //        fovy,
+    //        znear: 0.1,
+    //        zfar: 100.0,
+    //        //material,
+    //    }
+    //}
+
+    pub fn new() -> Self {
         let sensor_size = 24_f32;
         let focal_length = 50_f32;
         let fovy = 2.0 * ((sensor_size / focal_length) * 0.5).atan();
@@ -158,7 +172,7 @@ impl Projector {
             fovy,
             znear: 0.1,
             zfar: 100.0,
-            material,
+            //material,
         }
     }
 
@@ -205,7 +219,7 @@ impl Projector {
 
     pub fn build_view_projection_matrix(&self) -> glam::Mat4 {
         let proj = glam::Mat4::perspective_rh(self.fovy, self.aspect, self.znear, self.zfar);
-        proj * self.view
+        proj * self.view.inverse()
     }
 }
 

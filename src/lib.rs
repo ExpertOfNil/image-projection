@@ -152,10 +152,12 @@ struct State {
     camera_bind_group: wgpu::BindGroup,
     camera_buffer: wgpu::Buffer,
     depth_texture: texture::Texture,
-    materials: Vec<model::Material>,
+    //materials: Vec<model::Material>,
     meshes: Vec<model::Mesh>,
     model_meshes: Vec<model::Mesh>,
     projectors: Vec<camera::Projector>,
+    textures: Vec<texture::Texture>,
+    texture_bind_group: wgpu::BindGroup,
 
     axis_pipeline: wgpu::RenderPipeline,
     axis_bind_group: wgpu::BindGroup,
@@ -191,7 +193,10 @@ impl State {
 
         let descriptor = &wgpu::DeviceDescriptor {
             features: wgpu::Features::POLYGON_MODE_LINE
-                | wgpu::Features::ADDRESS_MODE_CLAMP_TO_BORDER,
+                | wgpu::Features::ADDRESS_MODE_CLAMP_TO_BORDER
+                | wgpu::Features::TEXTURE_BINDING_ARRAY
+                | wgpu::Features::SAMPLED_TEXTURE_AND_STORAGE_BUFFER_ARRAY_NON_UNIFORM_INDEXING
+                | wgpu::Features::BUFFER_BINDING_ARRAY,
             limits: if cfg!(target_arch = "wasm32") {
                 wgpu::Limits::downlevel_webgl2_defaults()
             } else {
@@ -219,6 +224,42 @@ impl State {
         };
         surface.configure(&device, &config);
 
+        //let texture_bind_group_layout =
+        //    device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+        //        entries: &[
+        //            wgpu::BindGroupLayoutEntry {
+        //                binding: 0,
+        //                visibility: wgpu::ShaderStages::FRAGMENT,
+        //                ty: wgpu::BindingType::Texture {
+        //                    multisampled: false,
+        //                    view_dimension: wgpu::TextureViewDimension::D2,
+        //                    sample_type: wgpu::TextureSampleType::Float { filterable: true },
+        //                },
+        //                count: None,
+        //            },
+        //            wgpu::BindGroupLayoutEntry {
+        //                binding: 1,
+        //                visibility: wgpu::ShaderStages::FRAGMENT,
+        //                ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
+        //                count: None,
+        //            },
+        //        ],
+        //        label: Some("texture_bind_group_layout"),
+        //    });
+
+        let img1 = resources::load_texture("calibration/0001.png", &device, &queue)
+            .await
+            .unwrap();
+        let img2 = resources::load_texture("calibration/0002.png", &device, &queue)
+            .await
+            .unwrap();
+        let img3 = resources::load_texture("calibration/0003.png", &device, &queue)
+            .await
+            .unwrap();
+        let textures = vec![img1, img2, img3];
+        let samplers: Vec<_> = textures.iter().map(|t| &t.sampler).collect();
+        let views: Vec<_> = textures.iter().map(|t| &t.view).collect();
+
         let texture_bind_group_layout =
             device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
                 entries: &[
@@ -230,17 +271,32 @@ impl State {
                             view_dimension: wgpu::TextureViewDimension::D2,
                             sample_type: wgpu::TextureSampleType::Float { filterable: true },
                         },
-                        count: None,
+                        count: Some(std::num::NonZeroU32::new(textures.len() as u32).unwrap()),
                     },
                     wgpu::BindGroupLayoutEntry {
                         binding: 1,
                         visibility: wgpu::ShaderStages::FRAGMENT,
                         ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
-                        count: None,
+                        count: Some(std::num::NonZeroU32::new(samplers.len() as u32).unwrap()),
                     },
                 ],
                 label: Some("texture_bind_group_layout"),
             });
+
+        let texture_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
+            label: Some("texture_bind_group"),
+            layout: &texture_bind_group_layout,
+            entries: &[
+                wgpu::BindGroupEntry {
+                    binding: 0,
+                    resource: wgpu::BindingResource::TextureViewArray(&views),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 1,
+                    resource: wgpu::BindingResource::SamplerArray(&samplers),
+                },
+            ],
+        });
 
         let sensor_size = 24_f32;
         let focal_length = 50_f32;
@@ -250,9 +306,9 @@ impl State {
         //let (eye, target) = target_from_pos_rot(pos, rot);
         let camera = camera::Camera {
             //eye: [0.0, -72.0, 6.0].into(),
-            eye: [0.0, 0.0, 5.0].into(),
+            eye: [-25.0, 0.0, 25.0].into(),
             target: glam::Vec3::ZERO,
-            up: glam::Vec3::Y,
+            up: glam::Vec3::Z,
             aspect: config.width as f32 / config.height as f32,
             fovy,
             znear: 0.1,
@@ -279,18 +335,21 @@ impl State {
         //        .unwrap();
         //let test_mat =
         //    model::Material::new("test", test_texture, &device, &texture_bind_group_layout);
-        let img1 = resources::load_texture("calibration/0001.png", &device, &queue)
-            .await
-            .unwrap();
-        let mat1 = model::Material::new("0001", img1, &device, &texture_bind_group_layout);
+        //let img1 = resources::load_texture("calibration/0001.png", &device, &queue)
+        //    .await
+        //    .unwrap();
+        //let mat1 = model::Material::new("0001", img1, &device, &texture_bind_group_layout);
+        //let mut materials = model::MaterialArray::new("0001", img1, &device, &texture_bind_group_layout);
         //let img2 = resources::load_texture("calibration/0002.png", &device, &queue)
         //    .await
         //    .unwrap();
         //let mat2 = model::Material::new("0002", img2, &device, &texture_bind_group_layout);
+        //mat_arr.add("0002", img2, &device, &texture_bind_group_layout);
         //let img3 = resources::load_texture("calibration/0003.png", &device, &queue)
         //    .await
         //    .unwrap();
         //let mat3 = model::Material::new("0003", img3, &device, &texture_bind_group_layout);
+        //mat_arr.add("0003", img3, &device, &texture_bind_group_layout);
         let projectors = vec![
             //camera::Projector {
             //    pos: [7.0, -40.0, 5.0].into(),
@@ -319,7 +378,7 @@ impl State {
             //    zfar: 100.0,
             //    material: mat3,
             //},
-            camera::Projector::new(mat1)
+            camera::Projector::new()
                 .with_fovy(fovy)
                 .with_view(glam::Mat4::from_cols(
                     glam::Vec4::new(1.0, 0.0, 0.0, 0.0),
@@ -327,37 +386,37 @@ impl State {
                     glam::Vec4::new(0.0, 0.0, 1.0, 0.0),
                     glam::Vec4::new(0.0, 0.0, 5.0, 1.0),
                 )),
-            //camera::Projector::new(mat2)
-            //    .with_fovy(fovy)
-            //    .with_view(glam::Mat4::from_cols(
-            //        glam::Vec4::new(0.0, -1.0, 0.0, 0.0),
-            //        glam::Vec4::new(0.7071067690849304, 0.0, 0.7071067690849304, 0.0),
-            //        glam::Vec4::new(-0.7071068286895752, 0.0, 0.7071068286895752, 0.0),
-            //        glam::Vec4::new(-5.0, 0.0, 5.0, 1.0),
-            //    )),
-            //camera::Projector::new(mat3)
-            //    .with_fovy(fovy)
-            //    .with_view(glam::Mat4::from_cols(
-            //        glam::Vec4::new(
-            //            -0.5547001957893372,
-            //            0.8320503830909729,
-            //            -1.4901162970204496e-08,
-            //            0.0,
-            //        ),
-            //        glam::Vec4::new(
-            //            -0.6748818755149841,
-            //            -0.44992122054100037,
-            //            0.5848976373672485,
-            //            0.0,
-            //        ),
-            //        glam::Vec4::new(
-            //            0.4866642355918884,
-            //            0.3244428336620331,
-            //            0.8111070990562439,
-            //            0.0,
-            //        ),
-            //        glam::Vec4::new(3.0, 2.0, 5.0, 1.0),
-            //    )),
+            camera::Projector::new()
+                .with_fovy(fovy)
+                .with_view(glam::Mat4::from_cols(
+                    glam::Vec4::new(0.0, -1.0, 0.0, 0.0),
+                    glam::Vec4::new(0.7071067690849304, 0.0, 0.7071067690849304, 0.0),
+                    glam::Vec4::new(-0.7071068286895752, 0.0, 0.7071068286895752, 0.0),
+                    glam::Vec4::new(-5.0, 0.0, 5.0, 1.0),
+                )),
+            camera::Projector::new()
+                .with_fovy(fovy)
+                .with_view(glam::Mat4::from_cols(
+                    glam::Vec4::new(
+                        -0.5547001957893372,
+                        0.8320503830909729,
+                        -1.4901162970204496e-08,
+                        0.0,
+                    ),
+                    glam::Vec4::new(
+                        -0.6748818755149841,
+                        -0.44992122054100037,
+                        0.5848976373672485,
+                        0.0,
+                    ),
+                    glam::Vec4::new(
+                        0.4866642355918884,
+                        0.3244428336620331,
+                        0.8111070990562439,
+                        0.0,
+                    ),
+                    glam::Vec4::new(3.0, 2.0, 5.0, 1.0),
+                )),
         ];
 
         let projector_uniforms: Vec<camera::CameraUniform> =
@@ -396,7 +455,9 @@ impl State {
                             has_dynamic_offset: false,
                             min_binding_size: None,
                         },
-                        count: None,
+                        count: Some(
+                            std::num::NonZeroU32::new(projector_uniforms.len() as u32).unwrap(),
+                        ),
                     },
                 ],
                 label: Some("camera_bind_group_layout"),
@@ -580,12 +641,12 @@ impl State {
         let texture = resources::load_texture("image_projection_test_square.png", &device, &queue)
             .await
             .unwrap();
-        let material = model::Material::new(
-            "image_projection",
-            texture,
-            &device,
-            &texture_bind_group_layout,
-        );
+        //let material = model::Material::new(
+        //    "image_projection",
+        //    texture,
+        //    &device,
+        //    &texture_bind_group_layout,
+        //);
         let cube_model = cube::Cube::new("test_cube", &device).into();
         let plane_model = cube::Plane::new("test_plane", &device).into();
         let bb_model = cube::Billboard::new("test_bb", &device).into();
@@ -612,9 +673,11 @@ impl State {
             camera_bind_group,
             depth_texture,
             meshes: vec![cube_model, plane_model, bb_model],
-            materials: vec![material],
+            //materials: vec![material],
             model_meshes,
             projectors,
+            textures,
+            texture_bind_group,
 
             axis_meshes,
             axis_bind_group,
@@ -698,10 +761,17 @@ impl State {
         //    .take(2)
         //    .for_each(|m| render_pass.draw_mesh(m, &self.materials[0], &self.camera_bind_group));
         //render_pass.draw_mesh(&self.meshes[1], &self.materials[1], &self.camera_bind_group);
-        self.projectors.iter().for_each(|proj| {
-            self.model_meshes
-                .iter()
-                .for_each(|m| render_pass.draw_mesh(m, &proj.material, &self.camera_bind_group))
+        // TODO: the material with the projector.  Currently each image is being projected from
+        // each projector.
+        self.model_meshes.iter().for_each(|m| {
+            render_pass.set_vertex_buffer(0, m.vertex_buffer.slice(..));
+            render_pass.set_index_buffer(m.index_buffer.slice(..), wgpu::IndexFormat::Uint32);
+            render_pass.set_bind_group(0, &self.texture_bind_group, &[]);
+            render_pass.set_bind_group(1, &self.camera_bind_group, &[]);
+            render_pass.draw_indexed(0..m.num_elements, 0, 0..1);
+            //self.projectors
+            //    .iter()
+            //    .for_each(|proj| render_pass.draw_mesh(m, &proj.material, &self.camera_bind_group))
         });
         render_pass.set_vertex_buffer(1, self.axis_instance_buffer.slice(..));
         render_pass.set_pipeline(&self.axis_pipeline);

@@ -81,6 +81,68 @@ impl Material {
     }
 }
 
+pub struct MaterialArray {
+    pub names: Vec<String>,
+    pub textures: Vec<texture::Texture>,
+    pub bind_groups: Vec<wgpu::BindGroup>,
+}
+
+impl MaterialArray {
+    pub fn new(
+        name: &str,
+        texture: texture::Texture,
+        device: &wgpu::Device,
+        bind_group_layout: &wgpu::BindGroupLayout,
+    ) -> Self {
+        let texture_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
+            layout: bind_group_layout,
+            entries: &[
+                wgpu::BindGroupEntry {
+                    binding: 0,
+                    resource: wgpu::BindingResource::TextureView(&texture.view),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 1,
+                    resource: wgpu::BindingResource::Sampler(&texture.sampler),
+                },
+            ],
+            label: None,
+        });
+
+        Self {
+            names: vec![name.to_string()],
+            textures: vec![texture],
+            bind_groups: vec![texture_bind_group],
+        }
+    }
+
+    pub fn add(
+        &mut self,
+        name: &str,
+        texture: texture::Texture,
+        device: &wgpu::Device,
+        bind_group_layout: &wgpu::BindGroupLayout,
+    ) {
+        let texture_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
+            layout: bind_group_layout,
+            entries: &[
+                wgpu::BindGroupEntry {
+                    binding: 0,
+                    resource: wgpu::BindingResource::TextureView(&texture.view),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 1,
+                    resource: wgpu::BindingResource::Sampler(&texture.sampler),
+                },
+            ],
+            label: None,
+        });
+        self.names.push(name.to_string());
+        self.textures.push(texture);
+        self.bind_groups.push(texture_bind_group);
+    }
+}
+
 pub struct Mesh {
     pub name: String,
     pub vertex_buffer: wgpu::Buffer,
