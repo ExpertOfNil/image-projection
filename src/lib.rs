@@ -120,6 +120,7 @@ struct State {
     camera_uniform: camera::CameraUniform,
     camera_bind_group: wgpu::BindGroup,
     camera_buffer: wgpu::Buffer,
+    projection: camera::Projection,
     depth_texture: texture::Texture,
     meshes: Vec<model::Mesh>,
     projectors: Vec<camera::Projector>,
@@ -131,6 +132,8 @@ struct State {
     axis_meshes: Vec<model::Mesh>,
     axis_instances: Vec<Instance>,
     axis_instance_buffer: wgpu::Buffer,
+
+    mouse_pressed: bool,
 }
 
 impl State {
@@ -245,27 +248,18 @@ impl State {
         let sensor_size = 24_f32;
         let focal_length = 50_f32;
         let fovy = 2.0 * ((sensor_size / focal_length) * 0.5).atan();
-        let camera = camera::Camera {
-            eye: [-25.0, 0.0, 25.0].into(),
-            target: glam::Vec3::ZERO,
-            up: glam::Vec3::Z,
-            aspect: config.width as f32 / config.height as f32,
+        let camera = camera::Camera::new(glam::Vec3::new(-25.0, 0.0, 0.0), 0.0, 0.0);
+        let projection = camera::Projection::new(
+            DEFAULT_WINDOW_SIZE.width,
+            DEFAULT_WINDOW_SIZE.height,
             fovy,
-            znear: 0.1,
-            zfar: 100.0,
-        };
-        let mat = camera.build_view_projection_matrix();
+            0.1,
+            100.0,
+        );
+        let camera_controller = camera::CameraController::new(10.0, 0.1);
 
         // Setup camera buffer
-        let camera_controller = camera::CameraController::new(0.2);
-        let camera_uniform = camera::CameraUniform {
-            view_proj: [
-                mat.x_axis.into(),
-                mat.y_axis.into(),
-                mat.z_axis.into(),
-                mat.w_axis.into(),
-            ],
-        };
+        let camera_uniform = camera::CameraUniform::new(camera.matrix(), projection.matrix());
         let camera_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: Some("Camera Buffer"),
             contents: bytemuck::cast_slice(&[camera_uniform]),
@@ -551,6 +545,7 @@ impl State {
             camera_uniform,
             camera_buffer,
             camera_bind_group,
+            projection,
             depth_texture,
             meshes,
             projectors,
@@ -562,6 +557,8 @@ impl State {
             axis_pipeline,
             axis_instances,
             axis_instance_buffer,
+
+            mouse_pressed: false,
         }
     }
 
@@ -571,27 +568,41 @@ impl State {
 
     pub fn resize(&mut self, new_size: winit::dpi::PhysicalSize<u32>) {
         if new_size.width > 0 && new_size.height > 0 {
+            self.projection.resize(new_size.width, new_size.height);
             self.size = new_size;
             self.config.width = new_size.width;
             self.config.height = new_size.height;
             self.surface.configure(&self.device, &self.config);
             self.depth_texture =
                 texture::Texture::create_depth_texture(&self.device, &self.config, "depth_texture");
-            self.camera.aspect = self.config.width as f32 / self.config.height as f32;
         }
     }
 
     pub fn input(&mut self, event: &WindowEvent) -> bool {
-        if self.camera_controller.process_events(event) {
-            self.window.request_redraw();
-            return true;
+        match event {
+            WindowEvent::KeyboardInput { event, .. } => self
+                .camera_controller
+                .process_keyboard(event.physical_key, event.state.is_pressed()),
+            WindowEvent::MouseWheel { delta, .. } => {
+                self.camera_controller.process_scroll(delta);
+                true
+            }
+            WindowEvent::MouseInput {
+                state,
+                button: MouseButton::Left,
+                ..
+            } => {
+                self.mouse_pressed = state.is_pressed();
+                true
+            }
+            _ => false,
         }
-        false
     }
 
-    fn update(&mut self) {
-        self.camera_controller.update_camera(&mut self.camera);
-        self.camera_uniform.update_view_proj(&self.camera);
+    fn update(&mut self, dt: instant::Duration) {
+        self.camera_controller.update_camera(&mut self.camera, dt);
+        self.camera_uniform
+            .update_view_proj(&self.camera, &self.projection);
         self.queue.write_buffer(
             &self.camera_buffer,
             0,
@@ -695,6 +706,7 @@ pub async fn run() {
     }
 
     let mut state = State::new(window).await;
+    let mut last_render_time = instant::Instant::now();
 
     event_loop
         .run(move |event, elwt| match event {
@@ -719,7 +731,10 @@ pub async fn run() {
                             }
                         }
                         WindowEvent::RedrawRequested => {
-                            state.update();
+                            let now = instant::Instant::now();
+                            let dt = now - last_render_time;
+                            last_render_time = now;
+                            state.update(dt);
                             match state.render() {
                                 Ok(_) => {}
                                 Err(wgpu::SurfaceError::Lost) => state.resize(state.size),
@@ -736,6 +751,14 @@ pub async fn run() {
                         }
                         _ => {}
                     }
+                }
+            }
+            Event::DeviceEvent {
+                event: DeviceEvent::MouseMotion { delta },
+                ..
+            } => {
+                if state.mouse_pressed {
+                    state.camera_controller.process_mouse(delta.0, delta.1)
                 }
             }
             _ => {}
