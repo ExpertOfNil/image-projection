@@ -7,9 +7,6 @@ struct CameraUniform {
 @group(0) @binding(0)
 var<uniform> camera: CameraUniform;
 
-@group(0) @binding(1)
-var<uniform> transform: mat4x4<f32>;
-
 struct VertexInput {
     @location(0) position: vec3<f32>,
 };

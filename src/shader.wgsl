@@ -48,8 +48,6 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
         let new_color = tex_color(ndc, i);
         color = mix(new_color, color, color.a);
     }
-    //let proj_coords = projectors[0].view_proj * in.world_pos;
-    //color = tex_color(proj_coords.xy / proj_coords.w);
     return color;
 }
 
